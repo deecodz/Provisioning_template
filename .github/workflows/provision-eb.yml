@@ -1,42 +1,11 @@
 on:
   workflow_call:
     inputs:
-      role_name:
-        description: 'Role Name'
-        required: true
-        type: string 
-      instance_profile_name:
-        description: 'Instance Profile Name'
-        required: true
-        type: string
-      app_name:
-        description: 'Elastic Beanstalk Application Name'
-        required: true
-        type: string
-      env_name:
-        description: 'Elastic Beanstalk Environment Name'
-        required: true
-        type: string
-      vpc_id:
-        description: 'VPC ID'
-        required: true
-        type: string
-      aws_region:
-        description: 'AWS Region'
-        required: true
-        type: string
-      security_group_name:
-        description: 'Name for the new Security Group'
-        required: true
-        type: string
-      solution_stack:
-        description: 'Elastic Beanstalk Solution Stack'
+      config-path:
         required: true
         type: string
     secrets:
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
+      envPAT:
         required: true
         
 
