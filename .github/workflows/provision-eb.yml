@@ -4,15 +4,19 @@ on:
       role_name:
         description: 'Role Name'
         required: true
+        type: string 
       instance_profile_name:
         description: 'Instance Profile Name'
         required: true
+        type: string
       app_name:
         description: 'Elastic Beanstalk Application Name'
         required: true
+        type: string
       env_name:
         description: 'Elastic Beanstalk Environment Name'
         required: true
+        type: string
       vpc_id:
         description: 'VPC ID'
         required: true
@@ -35,9 +39,10 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
         
-    jobs:
+    outputs:
       provision-eb-instance:
         runs-on: ubuntu-latest
+        
         steps:
           - name: Install AWS CLI
             run: |
