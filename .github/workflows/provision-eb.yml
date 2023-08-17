@@ -39,10 +39,10 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
         
+         
     jobs:
       provision-eb-instance:
         runs-on: ubuntu-latest
-        
         steps:
           - name: Install AWS CLI
             run: |
