@@ -5,13 +5,16 @@ on:
         required: true
         type: string
     secrets:
-      envPAT:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
         required: true
         
 
 jobs:
   provision-eb-instance:
     runs-on: ubuntu-latest
+    environment: production  
     steps:
       - name: Install AWS CLI
         run: |
@@ -25,23 +28,23 @@ jobs:
         run: |
           aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
           aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-          aws configure set region ${{ github.event.inputs.aws_region }}
+          aws configure set region $AWS_REGION  # Assuming AWS_REGION is an environment variable
 
       - name: Create instance profile and associate role
         run: |
-          aws iam get-instance-profile --instance-profile-name ${{ github.event.inputs.instance_profile_name }} \
-          || (aws iam create-instance-profile --instance-profile-name ${{ github.event.inputs.instance_profile_name }} &&
-          aws iam add-role-to-instance-profile --role-name ${{ github.event.inputs.role_name }} --instance-profile-name ${{ github.event.inputs.instance_profile_name }})
+          aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME \
+          || (aws iam create-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME &&
+          aws iam add-role-to-instance-profile --role-name $ROLE_NAME --instance-profile-name $INSTANCE_PROFILE_NAME)
 
       - name: Create Elastic Beanstalk Application
         run: | 
-          aws elasticbeanstalk create-application --application-name ${{ github.event.inputs.app_name }} --description "My application for Elastic Beanstalk"
+          aws elasticbeanstalk create-application --application-name $APP_NAME --description "My application for Elastic Beanstalk"
 
       - name: Create New Security Group
         id: create_sg  # Assign an ID to the step
         run: |
-          SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name ${{ github.event.inputs.security_group_name }} --description "Security group for Elastic Beanstalk" --vpc-id ${{ github.event.inputs.vpc_id }} | jq -r '.GroupId')
-          
+          SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name $SECURITY_GROUP_NAME --description "Security group for Elastic Beanstalk" --vpc-id $VPC_ID | jq -r '.GroupId')
+        
           # Add SSH (port 22) inbound rule
           aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr 0.0.0.0/0
       
@@ -57,12 +60,10 @@ jobs:
       - name: Provision Elastic Beanstalk instance
         run: |
           aws elasticbeanstalk create-environment \
-            --application-name ${{ github.event.inputs.app_name }} \
-            --environment-name ${{ github.event.inputs.env_name }} \
-            --option-settings Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=${{ github.event.inputs.instance_profile_name }} \
-            Namespace=aws:autoscaling:launchconfiguration,OptionName=EC2KeyName,Value=testkey \
-            Namespace=aws:autoscaling:launchconfiguration,OptionName=SecurityGroups,Value=${{ github.event.inputs.security_group_name }} \
-            --region ${{ github.event.inputs.aws_region }} \
-            --tier Type=Standard,Name=WebServer \
-            --solution-stack-name "${{ github.event.inputs.solution_stack }}"
-
+            --application-name $APP_NAME \
+            --environment-name $ENV_NAME \
+            --option-settings Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=$INSTANCE_PROFILE_NAME \
+            Namespace=aws:autoscaling:launchconfiguration,OptionName=EC2KeyName,Value=$EC2_KEY_NAME \
+            Namespace=aws:autoscaling:launchconfiguration,OptionName=SecurityGroups,Value=$SECURITY_GROUP_NAME \
+            --tier Name=WebServer \
+            --solution-stack-name $SOLUTION_STACK
