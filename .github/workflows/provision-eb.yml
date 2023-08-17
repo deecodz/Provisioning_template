@@ -39,7 +39,7 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
         
-         
+
     jobs:
       provision-eb-instance:
         runs-on: ubuntu-latest
@@ -96,3 +96,4 @@ on:
                 --region ${{ github.event.inputs.aws_region }} \
                 --tier Type=Standard,Name=WebServer \
                 --solution-stack-name "${{ github.event.inputs.solution_stack }}"
+
