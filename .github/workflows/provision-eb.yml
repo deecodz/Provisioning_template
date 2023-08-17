@@ -39,7 +39,7 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
         
-    outputs:
+    jobs:
       provision-eb-instance:
         runs-on: ubuntu-latest
         
