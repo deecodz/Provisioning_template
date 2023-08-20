@@ -47,7 +47,7 @@ on:
 jobs:
   provision-eb-instance:
     runs-on: ubuntu-latest
-    
+    environment: ${{ github.event.inputs.env_name }}
     steps:
       - name: Install AWS CLI
         run: |
