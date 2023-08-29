@@ -44,7 +44,7 @@ jobs:
     - name: Provision Database on Amazon RDS
       run: |
         aws rds create-db-instance \
-          --db-instance-identifier "${{ vars.DB_INSTANCE_NAME }}-${{ github.event.inputs.environment_name }}" \
+          --db-instance-identifier "${{ vars.DB_INSTANCE_NAME }} ${{ github.event.inputs.environment_name }}" \
           --db-instance-class ${{ vars.DB_INSTANCE_CLASS }} \
           --engine ${{ github.event.inputs.db_engine }} \
           --allocated-storage ${{ vars.DB_STORAGE_SIZE }} \
