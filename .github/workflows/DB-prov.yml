@@ -63,6 +63,7 @@ jobs:
         while true; do
           DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ vars.DB_INSTANCE_NAME }} | jq -r '.DBInstances[0].Endpoint.Address')
           if [ "$DB_ENDPOINT" != "null" ]; then
+            echo "DB_ENDPOINT_URL=$DB_ENDPOINT" >> $GITHUB_ENV
             echo "#### New DB endpoint is: $DB_ENDPOINT"  >> $GITHUB_STEP_SUMMARY
             break
           fi
