@@ -54,17 +54,19 @@ jobs:
           --db-name ${{ vars.DB_NAME }} \
           --no-publicly-accessible \
           --tags Key=Name,Value=${{ vars.DB_INSTANCE_NAME }}
-          
-         sleep 60
 
-    - name: Output Database Endpoint
-      id: output-db-endpoint
-      run: |
-        while true; do
-          DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ vars.DB_INSTANCE_NAME }} | jq -r '.DBInstances[0].Endpoint.Address')
-          if [ "$DB_ENDPOINT" != "null" ]; then
-            echo "DB_ENDPOINT_URL=$DB_ENDPOINT" >> $GITHUB_ENV
-            echo "#### New DB endpoint is: $DB_ENDPOINT"  >> $GITHUB_STEP_SUMMARY
-            break
-          fi
-        done
+#THESE COMMANDS BELOW ARE CORRECT BUT WILL NOT OUTPUT THE ENDPOINT URL BECAUSE DB CREATION TAKES TIME 5MINS MIN.
+# WE HAVE TO MANUALLY RETRIEVE THE ENDPOINT URL 
+    #      sleep 60
+
+    # - name: Output Database Endpoint
+    #   id: output-db-endpoint
+    #   run: |
+    #     while true; do
+    #       DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ vars.DB_INSTANCE_NAME }} | jq -r '.DBInstances[0].Endpoint.Address')
+    #       echo "DB_ENDPOINT_URL=$DB_ENDPOINT" >> $GITHUB_ENV
+    #       if [ "$DB_ENDPOINT" != "null" ]; then
+    #         echo "#### New DB endpoint is: $DB_ENDPOINT"  >> $GITHUB_STEP_SUMMARY
+    #         break
+    #       fi
+    #     done
