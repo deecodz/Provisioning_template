@@ -1,0 +1,68 @@
+name: Provision RDS Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_engine:
+        description: 'Database Engine (postgres or mysql)'
+        required: true
+        type: string
+      environment_name:
+        description: 'GitHub Environment Name'
+        required: true
+        type: string
+
+jobs:
+  provision-db:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment_name }}
+
+    steps:
+    - name: Set up AWS CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y awscli jq
+
+    - name: Set up AWS credentials
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        aws configure set default.region ${{ vars.AWS_REGION }}
+
+    - name: Create Security Group for RDS
+      run: |
+        SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name ${{ vars.SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
+
+        PORT=$(if [ "${{ github.event.inputs.db_engine }}" == "postgres" ]; then echo "5432"; else echo "3306"; fi)
+        aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port $PORT --cidr 0.0.0.0/0
+        echo "SECURITY_GROUP_ID=$SECURITY_GROUP_ID" >> $GITHUB_ENV
+
+    - name: Provision Database on Amazon RDS
+      run: |
+        aws rds create-db-instance \
+          --db-instance-identifier "${{ vars.DB_INSTANCE_NAME }}-${{ github.event.inputs.environment_name }}" \
+          --db-instance-class ${{ vars.DB_INSTANCE_CLASS }} \
+          --engine ${{ github.event.inputs.db_engine }} \
+          --allocated-storage ${{ vars.DB_STORAGE_SIZE }} \
+          --master-username ${{ vars.DB_USERNAME }} \
+          --master-user-password ${{ vars.DB_PASSWORD }} \
+          --vpc-security-group-ids $SECURITY_GROUP_ID \
+          --db-name ${{ vars.DB_NAME }} \
+          --no-publicly-accessible \
+          --tags Key=Name,Value=${{ vars.DB_INSTANCE_NAME }}
+
+    - name: Output Database Endpoint
+      id: output-db-endpoint
+      run: |
+        while true; do
+          DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ vars.DB_INSTANCE_NAME }} | jq -r '.DBInstances[0].Endpoint.Address')
+          if [ "$DB_ENDPOINT" != "null" ]; then
+            echo "::set-output name=db-endpoint-url::$DB_ENDPOINT"
+            break
+          fi
+          sleep 20 # Wait and retry
+        done
