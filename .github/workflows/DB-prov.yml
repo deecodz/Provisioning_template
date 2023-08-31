@@ -35,7 +35,7 @@ jobs:
 
     - name: Create Security Group for RDS
       run: |
-        SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name ${{ vars.SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
+        SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name ${{ vars.DB_SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
 
         PORT=$(if [ "${{ github.event.inputs.db_engine }}" == "postgres" ]; then echo "5432"; else echo "3306"; fi)
         aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port $PORT --cidr 0.0.0.0/0
