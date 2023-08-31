@@ -41,22 +41,18 @@ jobs:
 
     - name: Create Security Group for RDS
       run: |
-        # Check if the Security Group already exists based on the name
-        EXISTING_SECURITY_GROUP_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=${{ vars.DB_SECURITY_GROUP_NAME }} | jq -r '.SecurityGroups[0].GroupId')
+        # Try to get the existing Security Group ID based on the name. If it doesn't exist, create one.
+        SECURITY_GROUP_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=${{ vars.DB_SECURITY_GROUP_NAME }} | jq -r '.SecurityGroups[0].GroupId' || aws ec2 create-security-group --group-name ${{ vars.DB_SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
         
-        if [[ -z $EXISTING_SECURITY_GROUP_ID ]]; then
-          SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name ${{ vars.DB_SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
-          echo "Created new Security Group with ID: $SECURITY_GROUP_ID"
-        else
-          SECURITY_GROUP_ID=$EXISTING_SECURITY_GROUP_ID
-          echo "Using existing Security Group with ID: $SECURITY_GROUP_ID"
-        fi
+        echo "Using Security Group ID: $SECURITY_GROUP_ID"
     
         PORT=$(if [ "${{ github.event.inputs.db_engine }}" == "postgres" ]; then echo "5432"; else echo "3306"; fi)
         
-        aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port $PORT --cidr 0.0.0.0/0
+        # Try to add the rule and ignore the InvalidPermission.Duplicate error
+        aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port $PORT --cidr 0.0.0.0/0 || true
     
         echo "SECURITY_GROUP_ID=$SECURITY_GROUP_ID" >> $GITHUB_ENV
+
     
 
     - name: Provision Database on Amazon RDS
