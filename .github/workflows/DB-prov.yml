@@ -1,7 +1,7 @@
 name: Provision RDS Database
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       db_engine:
         description: 'Database Engine (postgres or mysql)'
