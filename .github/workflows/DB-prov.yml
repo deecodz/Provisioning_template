@@ -41,11 +41,24 @@ jobs:
 
     - name: Create Security Group for RDS
       run: |
-        # Try to get the existing Security Group ID based on the name. If it doesn't exist, create one.
-        SECURITY_GROUP_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=${{ vars.DB_SECURITY_GROUP_NAME }} | jq -r '.SecurityGroups[0].GroupId' || aws ec2 create-security-group --group-name ${{ vars.DB_SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }} | jq -r '.GroupId')
-        
-        # Ensure the ID is valid
+        # Describe the security group first
+        SECURITY_GROUP_DESCRIBE_OUTPUT=$(aws ec2 describe-security-groups --filters Name=group-name,Values=${{ vars.DB_SECURITY_GROUP_NAME }})
+    
+        # Check if the output contains a valid security group ID
+        SECURITY_GROUP_ID=$(echo "$SECURITY_GROUP_DESCRIBE_OUTPUT" | jq -r '.SecurityGroups[0].GroupId')
+    
+        # If no valid ID was found, attempt to create a new security group
         if [[ -z "$SECURITY_GROUP_ID" || "$SECURITY_GROUP_ID" == "null" ]]; then
+          SECURITY_GROUP_CREATE_OUTPUT=$(aws ec2 create-security-group --group-name ${{ vars.DB_SECURITY_GROUP_NAME }} --description "Security group for ${{ vars.DB_NAME }}" --vpc-id ${{ vars.VPC_ID }})
+    
+          # Extract the security group ID from the creation output
+          SECURITY_GROUP_ID=$(echo "$SECURITY_GROUP_CREATE_OUTPUT" | jq -r '.GroupId')
+        fi
+    
+        # Validate the final ID
+        if [[ -z "$SECURITY_GROUP_ID" || "$SECURITY_GROUP_ID" == "null" ]]; then
+          echo "Security Group Describe Output: $SECURITY_GROUP_DESCRIBE_OUTPUT"
+          echo "Security Group Create Output: $SECURITY_GROUP_CREATE_OUTPUT"
           echo "Failed to retrieve or create security group."
           exit 1
         fi
