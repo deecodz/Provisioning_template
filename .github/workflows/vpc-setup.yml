@@ -86,15 +86,6 @@ jobs:
           aws ec2 associate-route-table  --subnet-id $subnet_id --route-table-id $ROUTE_TABLE_ID
         done
 
-    # Create a Network ACL and associate it with the subnet
-    - name: Create and Associate Network ACL
-      run: |
-        NACL_ID=$(aws ec2 create-network-acl --vpc-id $VPC_ID --query 'NetworkAcl.NetworkAclId' --output text)
-        for subnet_id in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[].SubnetId' --output text); do
-          aws ec2 associate-network-acl --network-acl-id $NACL_ID --subnet-id $subnet_id
-        done
-        echo "NACL_ID=$NACL_ID" >> $GITHUB_ENV
-
         sleep 20
     # Output the created resources
     - name: Output Created Resources
