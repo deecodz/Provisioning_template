@@ -38,7 +38,7 @@ jobs:
     - name: Create NACL
       run: |
         NACL_ID=$(aws ec2 create-network-acl --vpc-id $VPC_ID --query 'NetworkAcl.NetworkAclId' --output text)
-        aws ec2 create-tags --resources $NACL_ID --tags Key=Name,Value="${VPC_NAME}-nacl"
+        aws ec2 create-tags --resources $NACL_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-nacl"
         echo "NACL_ID=$NACL_ID" >> $GITHUB_ENV
     
     - name: Create Subnets
@@ -46,7 +46,7 @@ jobs:
         SUBNET_IDS=""
         for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24"; do
           SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr --query 'Subnet.SubnetId' --output text)
-          aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${VPC_NAME}-subnet-$cidr"
+          aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-subnet-$cidr"
           echo "Created subnet with ID $SUBNET_ID and CIDR block $cidr in VPC $VPC_NAME"
           SUBNET_IDS="$SUBNET_IDS,$SUBNET_ID"
         done
@@ -95,7 +95,7 @@ jobs:
           aws ec2 associate-route-table  --subnet-id $subnet_id --route-table-id $ROUTE_TABLE_ID
         done
 
-        sleep 20
+        sleep 10
     # Output the created resources
     - name: Output Created Resources
       run: |
