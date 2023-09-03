@@ -56,9 +56,17 @@ jobs:
       run: |
         IFS=',' read -ra SUBNET_ARRAY <<< "$SUBNET_IDS"
         for SUBNET_ID in "${SUBNET_ARRAY[@]}"; do
+          echo "Checking for subnet ID: $SUBNET_ID and NACL ID: $NACL_ID"
+          
+          # Check for ASSOCIATION_ID
           ASSOCIATION_ID=$(aws ec2 describe-network-acls --network-acl-ids $NACL_ID --query 'NetworkAcls[0].Associations[0].NetworkAclAssociationId' --output text)
-          aws ec2 replace-network-acl-association --association-id $ASSOCIATION_ID --network-acl-id $NACL_ID
-          echo "Associated NACL $NACL_ID with Subnet $SUBNET_ID"
+          
+          if [ "$ASSOCIATION_ID" != "None" ]; then
+            aws ec2 replace-network-acl-association --association-id $ASSOCIATION_ID --network-acl-id $NACL_ID
+            echo "Associated NACL $NACL_ID with Subnet $SUBNET_ID"
+          else
+            echo "Could not find association for NACL: $NACL_ID and Subnet: $SUBNET_ID"
+          fi
         done
             
     # Create and attach Internet Gateway for VPC
