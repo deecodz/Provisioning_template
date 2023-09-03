@@ -35,10 +35,19 @@ jobs:
         aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=${{ github.event.inputs.vpc_name }}
         echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
 
-    - name: Create NACL
+    - name: Create and Configure NACL
       run: |
         NACL_ID=$(aws ec2 create-network-acl --vpc-id $VPC_ID --query 'NetworkAcl.NetworkAclId' --output text)
         aws ec2 create-tags --resources $NACL_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-nacl"
+
+        # Allow all inbound traffic
+        aws ec2 create-network-acl-entry --network-acl-id $NACL_ID --ingress \
+            --rule-number 100 --protocol tcp --port-range From=0,To=65535 --cidr-block 0.0.0.0/0 --rule-action allow
+
+        # Allow all outbound traffic
+        aws ec2 create-network-acl-entry --network-acl-id $NACL_ID --egress \
+            --rule-number 100 --protocol tcp --port-range From=0,To=65535 --cidr-block 0.0.0.0/0 --rule-action allow
+
         echo "NACL_ID=$NACL_ID" >> $GITHUB_ENV
     
     - name: Create Subnets
@@ -47,7 +56,11 @@ jobs:
         for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24"; do
           SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr --query 'Subnet.SubnetId' --output text)
           aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-subnet-$cidr"
-          echo "Created subnet with ID $SUBNET_ID and CIDR block $cidr in VPC $VPC_NAME"
+          
+          # Enable auto-assign public IP
+          aws ec2 modify-subnet-attribute --subnet-id $SUBNET_ID --map-public-ip-on-launch
+
+          echo "Created subnet with ID $SUBNET_ID and CIDR block $cidr in VPC ${{ github.event.inputs.vpc_name }}"
           SUBNET_IDS="$SUBNET_IDS,$SUBNET_ID"
         done
         echo "SUBNET_IDS=${SUBNET_IDS:1}" >> $GITHUB_ENV
