@@ -28,20 +28,39 @@ jobs:
         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws configure set default.region ${{ github.event.inputs.aws_region }}
 
-     #Create VPC
+    #Create VPC
     - name: Create VPC
       run: |
-          VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query 'Vpc.VpcId' --output text)
-          aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=${{ github.event.inputs.vpc_name }}
-          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+        VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query 'Vpc.VpcId' --output text)
+        aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=${{ github.event.inputs.vpc_name }}
+        echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
 
-    # Create multiple subnets within VPC
+    - name: Create NACL
+      run: |
+        NACL_ID=$(aws ec2 create-network-acl --vpc-id $VPC_ID --query 'NetworkAcl.NetworkAclId' --output text)
+        aws ec2 create-tags --resources $NACL_ID --tags Key=Name,Value="${VPC_NAME}-nacl"
+        echo "NACL_ID=$NACL_ID" >> $GITHUB_ENV
+    
     - name: Create Subnets
       run: |
+        SUBNET_IDS=""
         for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24"; do
-          aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr
+          SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr --query 'Subnet.SubnetId' --output text)
+          aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${VPC_NAME}-subnet-$cidr"
+          echo "Created subnet with ID $SUBNET_ID and CIDR block $cidr in VPC $VPC_NAME"
+          SUBNET_IDS="$SUBNET_IDS,$SUBNET_ID"
         done
+        echo "SUBNET_IDS=${SUBNET_IDS:1}" >> $GITHUB_ENV
 
+    - name: Associate NACL with Subnets
+      run: |
+        IFS=',' read -ra SUBNET_ARRAY <<< "$SUBNET_IDS"
+        for SUBNET_ID in "${SUBNET_ARRAY[@]}"; do
+          ASSOCIATION_ID=$(aws ec2 describe-network-acls --network-acl-ids $NACL_ID --query 'NetworkAcls[0].Associations[0].NetworkAclAssociationId' --output text)
+          aws ec2 replace-network-acl-association --association-id $ASSOCIATION_ID --network-acl-id $NACL_ID
+          echo "Associated NACL $NACL_ID with Subnet $SUBNET_ID"
+        done
+            
     # Create and attach Internet Gateway for VPC
     - name: Create and Attach Internet Gateway
       run: |
