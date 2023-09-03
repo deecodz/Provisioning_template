@@ -53,15 +53,18 @@ jobs:
     - name: Create Subnets
       run: |
         SUBNET_IDS=""
-        for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24"; do
-          SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr --query 'Subnet.SubnetId' --output text)
-          aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-subnet-$cidr"
-          
-          # Enable auto-assign public IP
-          aws ec2 modify-subnet-attribute --subnet-id $SUBNET_ID --map-public-ip-on-launch
-
-          echo "Created subnet with ID $SUBNET_ID and CIDR block $cidr in VPC ${{ github.event.inputs.vpc_name }}"
+        AVAILABLE_AZS=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[].ZoneName' --output text)
+        IFS=$'\t' read -ra AZ_ARRAY <<< "$AVAILABLE_AZS"
+        
+        CIDR_INDEX=1
+        for az in "${AZ_ARRAY[@]}"; do
+          CIDR_BLOCK="10.0.${CIDR_INDEX}.0/24"
+          SUBNET_ID=$(aws ec2 create-subnet --availability-zone $az --vpc-id $VPC_ID --cidr-block $CIDR_BLOCK --query 'Subnet.SubnetId' --output text)
+          aws ec2 create-tags --resources $SUBNET_ID --tags Key=Name,Value="${{ github.event.inputs.vpc_name }}-subnet-$CIDR_BLOCK"
+          aws ec2 modify-subnet-attribute --subnet-id $SUBNET_ID --map-public-ip-on-launch # Enables auto-assign public IP
+          echo "Created subnet with ID $SUBNET_ID and CIDR block $CIDR_BLOCK in VPC ${{ github.event.inputs.vpc_name }} in AZ $az"
           SUBNET_IDS="$SUBNET_IDS,$SUBNET_ID"
+          ((CIDR_INDEX++))
         done
         echo "SUBNET_IDS=${SUBNET_IDS:1}" >> $GITHUB_ENV
 
