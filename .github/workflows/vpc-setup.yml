@@ -1,0 +1,84 @@
+name: AWS VPC Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      vpc_name:
+        description: 'VPC Name'
+        required: true
+        type: string 
+
+jobs:
+  setup-vpc:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up AWS CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y awscli
+
+    - name: Configure AWS Credentials
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set default.region ${{ github.event.inputs.aws_region }}
+
+     #Create VPC
+    - name: Create VPC
+      run: |
+          VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query 'Vpc.VpcId' --output text)
+          aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=${{ github.event.inputs.vpc_name }}
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+
+    # Create multiple subnets within VPC
+    - name: Create Subnets
+      run: |
+        for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24"; do
+          aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $cidr
+        done
+
+    # Create and attach Internet Gateway for VPC
+    - name: Create and Attach Internet Gateway
+      run: |
+        IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
+        aws ec2 attach-internet-gateway --vpc-id $VPC_ID --internet-gateway-id $IGW_ID
+
+    # Create a custom route table for the VPC
+    - name: Create Route Table
+      run: |
+        ROUTE_TABLE_ID=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+        echo "ROUTE_TABLE_ID=$ROUTE_TABLE_ID" >> $GITHUB_ENV
+
+    # Add a route to Internet Gateway
+    - name: Add Route to Internet Gateway
+      run: |
+        aws ec2 create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
+
+    # Associate route table with all subnets (making them public)
+    - name: Associate Route Table with Subnets
+      run: |
+        for subnet_id in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[].SubnetId' --output text); do
+          aws ec2 associate-route-table  --subnet-id $subnet_id --route-table-id $ROUTE_TABLE_ID
+        done
+
+    # Create a Network ACL and associate it with the subnet
+    - name: Create and Associate Network ACL
+      run: |
+        NACL_ID=$(aws ec2 create-network-acl --vpc-id $VPC_ID --query 'NetworkAcl.NetworkAclId' --output text)
+        for subnet_id in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[].SubnetId' --output text); do
+          aws ec2 associate-network-acl --network-acl-id $NACL_ID --subnet-id $subnet_id
+        done
+
+        sleep 30
+    # Output the created resources
+    - name: Output Created Resources
+      run: |
+        echo "#### Created VPC: $VPC_ID" >> $GITHUB_STEP_SUMMARY
+        echo "#### Created Internet Gateway: $IGW_ID" >> $GITHUB_STEP_SUMMARY
+        echo "#### Created Route Table: $ROUTE_TABLE_ID" >> $GITHUB_STEP_SUMMARY
+        echo "#### Created NACL: $NACL_ID" >> $GITHUB_STEP_SUMMARY
