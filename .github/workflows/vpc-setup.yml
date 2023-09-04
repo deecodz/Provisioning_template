@@ -112,6 +112,28 @@ jobs:
         done
 
         sleep 10
+        
+    # Create Default Security Group
+    - name: Create Default Security Group
+      run: |
+        SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name "${{ github.event.inputs.vpc_name }}-default-sg" --description "Default security group for VPC ${{ github.event.inputs.vpc_name }}" --vpc-id $VPC_ID --query 'GroupId' --output text)
+        # Allow all inbound and outbound traffic within the VPC
+        aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol all --cidr 10.0.0.0/16
+        aws ec2 authorize-security-group-egress --group-id $SECURITY_GROUP_ID --protocol all --cidr 10.0.0.0/16
+        echo "SECURITY_GROUP_ID=$SECURITY_GROUP_ID" >> $GITHUB_ENV
+
+    # Enable DNS support and DNS hostnames
+    - name: Enable DNS support and DNS hostnames
+      run: |
+        aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support "{\"Value\":true}"
+        aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames "{\"Value\":true}"
+
+    # Associate IPv6 CIDR Block
+    - name: Associate IPv6 CIDR Block
+      run: |
+        IPV6_BLOCK=$(aws ec2 associate-vpc-cidr-block --vpc-id $VPC_ID --amazon-provided-ipv6-cidr-block --query 'Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock' --output text)
+        echo "IPV6_BLOCK=$IPV6_BLOCK" >> $GITHUB_ENV
+
     # Output the created resources
     - name: Output Created Resources
       run: |
@@ -119,3 +141,5 @@ jobs:
         echo "#### Created Internet Gateway: $IGW_ID" >> $GITHUB_STEP_SUMMARY
         echo "#### Created Route Table: $ROUTE_TABLE_ID" >> $GITHUB_STEP_SUMMARY
         echo "#### Created NACL: $NACL_ID" >> $GITHUB_STEP_SUMMARY
+        echo "#### Created Security Group: $SECURITY_GROUP_ID" >> $GITHUB_STEP_SUMMARY
+        
